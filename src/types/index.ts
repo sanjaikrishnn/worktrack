@@ -29,6 +29,10 @@ export interface Task {
   submissionFile?: string;
   submissionNotes?: string;
   submittedAt?: string;
+  qaStatus?: 'Pass' | 'Fail' | 'Pending';
+  qaVerifiedAt?: string;
+  qaVerifiedByUserId?: string;
+  qaDefectReason?: string;
   createdAt: string;
   updatedAt: string;
 }

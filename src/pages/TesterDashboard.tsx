@@ -11,6 +11,10 @@ import {
   FileText,
   ShieldCheck,
   Search,
+  AlertOctagon,
+  Clock,
+  ArrowRight,
+  Filter,
 } from 'lucide-react';
 import { apiReportBug } from '../services/api';
 
@@ -31,7 +35,7 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
 }) => {
   const [bugTitle, setBugTitle] = useState('');
   const [selectedTask, setSelectedTask] = useState(tasks[0]?.taskId || 'T-002');
-  const [moduleName, setModuleName] = useState('Payment Gateway');
+  const [moduleName, setModuleName] = useState(tasks[0]?.moduleName || 'Payment Gateway');
   const [severity, setSeverity] = useState<'High' | 'Medium' | 'Low'>('High');
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState('');
@@ -41,14 +45,17 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pass' | 'fail' | 'pending'>('all');
 
-  const totalModules = 12;
-  const testedCount = 8;
-  const bugsFoundCount = bugs.length || 3;
+  // Real database metrics
+  const totalModules = tasks.length;
+  const passedCount = tasks.filter((t) => t.qaStatus === 'Pass').length;
+  const failedCount = tasks.filter((t) => t.qaStatus === 'Fail' || t.status === 'reopened').length;
+  const bugsFoundCount = bugs.length;
 
   const handleTaskChange = (taskId: string) => {
     setSelectedTask(taskId);
-    const matched = tasks.find((t) => t.taskId === taskId);
+    const matched = tasks.find((t) => t.taskId === taskId || t.id === taskId);
     if (matched) {
       setModuleName(matched.moduleName);
     }
@@ -66,7 +73,7 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
       setErrorMsg('');
       setSuccessMsg('');
 
-      const matchedTask = tasks.find((t) => t.taskId === selectedTask);
+      const matchedTask = tasks.find((t) => t.taskId === selectedTask || t.id === selectedTask);
 
       const res = await apiReportBug({
         title: bugTitle.trim(),
@@ -94,21 +101,41 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
     }
   };
 
+  const filteredTasks = tasks.filter((t) => {
+    if (statusFilter === 'pass') return t.qaStatus === 'Pass';
+    if (statusFilter === 'fail') return t.qaStatus === 'Fail' || t.status === 'reopened';
+    if (statusFilter === 'pending') return !t.qaStatus || t.qaStatus === 'Pending';
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-[#2563EB] text-[11px] font-bold border border-blue-200">
+              QA Verification & Quality Control
+            </span>
+          </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-[#172033] tracking-tight">
-            QA Verification Dashboard
+            QA Dashboard
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] mt-1 font-medium">
-            Test delivered modules, record reproducible defects, and trigger corrective workflows.
+            Inspect delivered operational tasks, record Pass/Fail verification verdicts, and trigger corrective workflows.
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onRefresh}
+            className="px-4 py-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-semibold text-[#172033] rounded-xl transition-colors cursor-pointer"
+          >
+            Refresh Pipeline
+          </button>
         </div>
       </div>
 
-      {/* 3 Stat Cards */}
+      {/* 3 Real Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Total Modules */}
         <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
@@ -121,18 +148,18 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
           </div>
         </div>
 
-        {/* Tested Modules */}
+        {/* Tested Modules (Pass) */}
         <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-teal-50 text-[#0D9488] flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
-            <p className="text-xs text-[#64748B] font-medium">Tested & Verified</p>
-            <p className="text-2xl font-bold text-teal-700 mt-0.5">{testedCount}</p>
+            <p className="text-xs text-[#64748B] font-medium">Verified & Passed</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-0.5">{passedCount}</p>
           </div>
         </div>
 
-        {/* Bugs Found */}
+        {/* Bugs Found (Defects / Fail) */}
         <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
             <Bug className="w-6 h-6 stroke-[2.2]" />
@@ -147,16 +174,42 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
       {/* Main Grid: Submitted Modules Table & Create Bug Report Form */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Submitted Modules Table */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-[#172033] text-base">Submitted Modules</h3>
-              <p className="text-xs text-[#64748B]">Active QA verification pipeline</p>
+              <p className="text-xs text-[#64748B]">Active QA verification pipeline and inspection records</p>
             </div>
-            <span className="text-[11px] font-semibold text-slate-400">Build Artifacts</span>
+            {/* Filter buttons */}
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                  statusFilter === 'all' ? 'bg-white text-[#172033] shadow-xs' : 'text-[#64748B] hover:text-[#172033]'
+                }`}
+              >
+                All ({tasks.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter('pass')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                  statusFilter === 'pass' ? 'bg-emerald-100 text-emerald-800 shadow-xs' : 'text-[#64748B] hover:text-emerald-700'
+                }`}
+              >
+                Pass ({passedCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('fail')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                  statusFilter === 'fail' ? 'bg-rose-100 text-rose-800 shadow-xs' : 'text-[#64748B] hover:text-rose-700'
+                }`}
+              >
+                Fail ({failedCount})
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-[#E2E8F0] text-[#64748B] font-semibold">
@@ -168,99 +221,97 @@ export const TesterDashboard: React.FC<TesterDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-[#172033]">
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-[#172033]">Login Module</td>
-                  <td className="py-3.5 px-4 text-[#64748B]">John Doe</td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Pass
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-[#64748B]">10 Oct</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => onOpenTask('T-001')}
-                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
-                    >
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
+                {filteredTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-[#64748B]">
+                      No modules found matching filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTasks.map((t) => {
+                    const isPass = t.qaStatus === 'Pass';
+                    const isFail = t.qaStatus === 'Fail' || t.status === 'reopened';
+                    const isPending = !isPass && !isFail;
 
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-[#172033]">Payment Gateway</td>
-                  <td className="py-3.5 px-4 text-[#64748B]">Jane Smith</td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                      Fail
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-[#64748B]">11 Oct</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => onOpenTask('T-002')}
-                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
-                    >
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
+                    // Format tested date
+                    let dateDisplay = 'Pending';
+                    if (t.qaVerifiedAt) {
+                      dateDisplay = new Date(t.qaVerifiedAt).toLocaleDateString('en-US', {
+                        day: 'numeric',
+                        month: 'short',
+                      });
+                    } else if (t.submittedAt) {
+                      dateDisplay = new Date(t.submittedAt).toLocaleDateString('en-US', {
+                        day: 'numeric',
+                        month: 'short',
+                      });
+                    } else if (t.deadline) {
+                      dateDisplay = new Date(t.deadline).toLocaleDateString('en-US', {
+                        day: 'numeric',
+                        month: 'short',
+                      });
+                    }
 
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-[#172033]">Reporting Engine</td>
-                  <td className="py-3.5 px-4 text-[#64748B]">Alex Kumar</td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Pass
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-[#64748B]">12 Oct</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => onOpenTask('T-004')}
-                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
-                    >
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
-
-                {tasks
-                  .filter((t) => t.status === 'completed' || t.status === 'reopened')
-                  .slice(0, 3)
-                  .map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-[#172033]">{t.moduleName}</td>
-                      <td className="py-3.5 px-4 text-[#64748B]">{t.assignedToName || 'Developer'}</td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            t.status === 'reopened'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {t.status === 'reopened' ? 'Fail' : 'Pass'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-[#64748B]">15 Oct</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => onOpenTask(t.taskId)}
-                          className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
-                        >
-                          Inspect
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-[#172033]">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-[#172033] hover:text-[#2563EB] transition-colors cursor-pointer" onClick={() => onOpenTask(t.taskId)}>
+                              {t.moduleName}
+                            </span>
+                            <span className="text-[10px] text-[#64748B] font-mono">{t.taskId}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-[#64748B] font-medium">
+                          {t.assignedToName || t.originalDelivererName || 'John Doe'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {/* Pass/Fail status badges */}
+                          {isPass && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                              Pass
+                            </span>
+                          )}
+                          {isFail && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              <AlertOctagon className="w-3 h-3 text-rose-600 shrink-0" />
+                              Fail
+                            </span>
+                          )}
+                          {isPending && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-[#64748B] font-medium">{dateDisplay}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          {/* Inspected button: white background, blue border and text */}
+                          <button
+                            onClick={() => onOpenTask(t.taskId)}
+                            className="bg-white border border-[#2563EB] text-[#2563EB] hover:bg-blue-50 font-bold px-3 py-1 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                            title={`Inspect ${t.taskId} - ${t.moduleName}`}
+                          >
+                            Inspected
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
+          </div>
+          <div className="p-3 bg-slate-50 border-t border-slate-100 text-[11px] text-[#64748B] flex items-center justify-between">
+            <span>Showing {filteredTasks.length} real operational deliverables</span>
+            <span className="font-semibold text-teal-700">Database Synced</span>
           </div>
         </div>
 
         {/* Right Column: Create Bug Report Form */}
-        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs">
+        <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
               <Bug className="w-4 h-4" />

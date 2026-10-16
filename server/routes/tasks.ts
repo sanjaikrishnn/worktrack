@@ -191,3 +191,210 @@ tasksRouter.post('/:id/submit', requireAuth, (req: Request, res: Response) => {
 
   res.json({ task, message: 'Work submitted successfully! Task marked as completed and sent for QA testing.' });
 });
+
+// POST /api/tasks/:id/verify - QA Tester verifies task deliverable (Pass or Fail)
+tasksRouter.post('/:id/verify', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as User;
+  const { id } = req.params;
+  const {
+    result,
+    defectReason,
+    defectDescription,
+    severity,
+    stepsToReproduce,
+    expectedResult,
+    actualResult,
+    evidenceName,
+  } = req.body;
+
+  if (result !== 'PASS' && result !== 'FAIL') {
+    return res.status(400).json({ error: 'Result must be either PASS or FAIL.' });
+  }
+
+  const tasks = db.get('tasks');
+  const task = tasks.find((t) => t.id === id || t.taskId.toLowerCase() === id.toLowerCase());
+
+  if (!task) {
+    return res.status(404).json({ error: 'Task not found.' });
+  }
+
+  const now = new Date().toISOString();
+  const users = db.get('users');
+  const taskHistory = db.get('taskHistory');
+  const notifications = db.get('notifications');
+  const auditLogs = db.get('auditLogs');
+
+  if (result === 'PASS') {
+    const prevStatus = task.status;
+    task.qaStatus = 'Pass';
+    task.qaVerifiedAt = now;
+    task.qaVerifiedByUserId = user.id;
+    task.qaDefectReason = undefined;
+    if (task.status !== 'completed') {
+      task.status = 'completed';
+      task.progress = 100;
+    }
+    task.updatedAt = now;
+    db.set('tasks', tasks);
+
+    // Record audit and history
+    taskHistory.push({
+      id: `th_${crypto.randomBytes(6).toString('hex')}`,
+      taskId: task.id,
+      previousStatus: prevStatus,
+      newStatus: 'completed',
+      changedByUserId: user.id,
+      comment: `QA Verification PASSED by ${user.name} (${user.role.toUpperCase()}). Deliverable approved for release.`,
+      timestamp: now,
+    });
+    db.set('taskHistory', taskHistory);
+
+    // Notify assigned employee & managers
+    const recipientIds = new Set<string>();
+    if (task.assignedToUserId && task.assignedToUserId !== user.id) recipientIds.add(task.assignedToUserId);
+    if (task.originalDeliveryUserId && task.originalDeliveryUserId !== user.id) recipientIds.add(task.originalDeliveryUserId);
+    users.filter((u) => u.role === 'manager' || u.role === 'admin').forEach((m) => {
+      if (m.id !== user.id) recipientIds.add(m.id);
+    });
+
+    for (const rId of recipientIds) {
+      notifications.unshift({
+        id: `notif_${crypto.randomBytes(6).toString('hex')}`,
+        userId: rId,
+        title: `QA Passed: ${task.taskId}`,
+        message: `${user.name} verified and approved ${task.moduleName} (${task.taskId}). Module passed QA inspection.`,
+        type: 'fix_approved',
+        read: false,
+        link: `/tasks/${task.taskId}`,
+        createdAt: now,
+      });
+    }
+    db.set('notifications', notifications);
+
+    auditLogs.unshift({
+      id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+      userId: user.id,
+      userName: user.name,
+      action: 'QA_VERIFICATION_PASS',
+      entityType: 'task',
+      entityId: task.taskId,
+      details: `QA verification PASSED for ${task.taskId} (${task.moduleName}).`,
+      timestamp: now,
+    });
+    db.set('auditLogs', auditLogs);
+
+    // Synchronize updates with Manager and Employee dashboards
+    eventBus.broadcast('TASK_QA_VERIFIED', { task, qaStatus: 'Pass' });
+    eventBus.broadcast('TASK_UPDATED', { task });
+
+    return res.json({
+      success: true,
+      task,
+      message: `QA Verification PASSED: Task ${task.taskId} (${task.moduleName}) passed inspection.`,
+    });
+  } else {
+    // FAIL workflow: must require a defect reason, create/link the bug, and trigger the corrective workflow
+    if (!defectReason || !defectReason.trim()) {
+      return res.status(400).json({ error: 'A defect reason is required when marking QA verification as FAIL.' });
+    }
+
+    const prevStatus = task.status;
+    task.qaStatus = 'Fail';
+    task.qaVerifiedAt = now;
+    task.qaVerifiedByUserId = user.id;
+    task.qaDefectReason = defectReason.trim();
+    task.status = 'reopened';
+    task.progress = Math.min(task.progress, 50);
+    task.updatedAt = now;
+    db.set('tasks', tasks);
+
+    // Create & link the defect bug
+    const bugs = db.get('bugReports');
+    const nextNum = bugs.length + 1;
+    const bugId = `BUG-${String(nextNum).padStart(3, '0')}`;
+    const originalDelivererUserId = task.originalDeliveryUserId || task.assignedToUserId;
+
+    const newBug: any = {
+      id: `bug_${crypto.randomBytes(6).toString('hex')}`,
+      bugId,
+      title: defectReason.trim(),
+      description: defectDescription?.trim() || `QA Verification Failed: ${defectReason.trim()}`,
+      stepsToReproduce: stepsToReproduce?.trim() || '1. Download deliverable build\n2. Perform QA inspection\n3. Observed defect during verification',
+      expectedResult: expectedResult?.trim() || 'Module must pass QA functional test specifications without defects.',
+      actualResult: actualResult?.trim() || defectReason.trim(),
+      severity: severity || 'High',
+      evidenceName: evidenceName || 'qa_defect_evidence.png',
+      evidenceUrl: '/uploads/defect-evidence.png',
+      taskId: task.id,
+      moduleId: task.moduleId,
+      moduleName: task.moduleName,
+      reportedByUserId: user.id,
+      reportedAt: now,
+      status: 'reported',
+      originalDelivererUserId,
+      assignedToUserId: task.assignedToUserId, // Route directly to author for corrective rework
+    };
+
+    bugs.unshift(newBug);
+    db.set('bugReports', bugs);
+
+    // Task history log
+    taskHistory.push({
+      id: `th_${crypto.randomBytes(6).toString('hex')}`,
+      taskId: task.id,
+      previousStatus: prevStatus,
+      newStatus: 'reopened',
+      changedByUserId: user.id,
+      comment: `QA Verification FAILED by ${user.name}: "${defectReason.trim()}". Defect ${bugId} created and task reopened for corrective rework.`,
+      timestamp: now,
+    });
+    db.set('taskHistory', taskHistory);
+
+    // Notifications to assigned employee & manager
+    const recipientIds = new Set<string>();
+    if (task.assignedToUserId && task.assignedToUserId !== user.id) recipientIds.add(task.assignedToUserId);
+    if (task.originalDeliveryUserId && task.originalDeliveryUserId !== user.id) recipientIds.add(task.originalDeliveryUserId);
+    users.filter((u) => u.role === 'manager' || u.role === 'admin').forEach((m) => {
+      if (m.id !== user.id) recipientIds.add(m.id);
+    });
+
+    for (const rId of recipientIds) {
+      notifications.unshift({
+        id: `notif_${crypto.randomBytes(6).toString('hex')}`,
+        userId: rId,
+        title: `QA Failed: ${task.taskId} (${bugId})`,
+        message: `QA inspection FAILED on ${task.moduleName} (${task.taskId}). Defect ${bugId} logged: "${defectReason.trim()}". Corrective rework workflow triggered.`,
+        type: 'bug_reported',
+        read: false,
+        link: `/tasks/${task.taskId}`,
+        createdAt: now,
+      });
+    }
+    db.set('notifications', notifications);
+
+    // Audit log
+    auditLogs.unshift({
+      id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+      userId: user.id,
+      userName: user.name,
+      action: 'QA_VERIFICATION_FAIL',
+      entityType: 'task',
+      entityId: task.taskId,
+      details: `QA verification FAILED for ${task.taskId} (${task.moduleName}). Defect ${bugId} created: ${defectReason.trim()}`,
+      timestamp: now,
+    });
+    db.set('auditLogs', auditLogs);
+
+    // Trigger real-time sync across Manager and Employee dashboards
+    eventBus.broadcast('TASK_QA_VERIFIED', { task, qaStatus: 'Fail', bug: newBug });
+    eventBus.broadcast('BUG_REPORTED', { bug: newBug, task });
+    eventBus.broadcast('TASK_UPDATED', { task });
+
+    return res.status(201).json({
+      success: true,
+      task,
+      bug: newBug,
+      message: `QA Verification FAILED: Defect ${bugId} created and corrective workflow triggered.`,
+    });
+  }
+});

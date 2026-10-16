@@ -34,6 +34,10 @@ export interface Task {
   submissionFile?: string;
   submissionNotes?: string;
   submittedAt?: string;
+  qaStatus?: 'Pass' | 'Fail' | 'Pending';
+  qaVerifiedAt?: string;
+  qaVerifiedByUserId?: string;
+  qaDefectReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -327,8 +331,11 @@ function createInitialDatabase(): DatabaseData {
       submissionFile: 'login_v1.0.zip',
       submissionNotes: 'All OAuth and JWT validations implemented.',
       submittedAt: '2025-10-10T14:30:00Z',
+      qaStatus: 'Pass',
+      qaVerifiedAt: '2025-10-10T15:00:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
       createdAt: '2025-10-01T09:00:00Z',
-      updatedAt: '2025-10-10T14:30:00Z',
+      updatedAt: '2025-10-10T15:00:00Z',
     },
     {
       id: 'tsk_002',
@@ -343,6 +350,13 @@ function createInitialDatabase(): DatabaseData {
       deadline: '2025-10-15',
       progress: 60,
       status: 'in_progress',
+      submissionFile: 'payment_gateway_v1.2.zip',
+      submissionNotes: 'Payment intent and webhook handlers.',
+      submittedAt: '2025-10-11T12:00:00Z',
+      qaStatus: 'Fail',
+      qaVerifiedAt: '2025-10-11T16:00:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
+      qaDefectReason: 'Payment webhook callback fails on timeout and invalid currency parsing.',
       createdAt: '2025-10-02T10:00:00Z',
       updatedAt: '2025-10-11T16:00:00Z',
     },
@@ -357,10 +371,16 @@ function createInitialDatabase(): DatabaseData {
       originalDeliveryUserId: 'usr_emp_001',
       createdByUserId: 'usr_mgr_001',
       deadline: '2025-10-18',
-      progress: 20,
-      status: 'in_progress',
+      progress: 100,
+      status: 'completed',
+      submissionFile: 'ui_responsive_v2.zip',
+      submissionNotes: 'Tailwind breakpoints and mobile nav tested.',
+      submittedAt: '2025-10-12T09:00:00Z',
+      qaStatus: 'Pass',
+      qaVerifiedAt: '2025-10-12T11:20:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
       createdAt: '2025-10-05T11:00:00Z',
-      updatedAt: '2025-10-12T09:00:00Z',
+      updatedAt: '2025-10-12T11:20:00Z',
     },
     {
       id: 'tsk_004',
@@ -373,10 +393,16 @@ function createInitialDatabase(): DatabaseData {
       originalDeliveryUserId: 'usr_emp_003',
       createdByUserId: 'usr_mgr_001',
       deadline: '2025-10-20',
-      progress: 0,
-      status: 'pending',
+      progress: 100,
+      status: 'completed',
+      submissionFile: 'reporting_engine_v1.zip',
+      submissionNotes: 'Aggregation queries and CSV streaming.',
+      submittedAt: '2025-10-12T16:00:00Z',
+      qaStatus: 'Pass',
+      qaVerifiedAt: '2025-10-12T17:30:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
       createdAt: '2025-10-08T09:00:00Z',
-      updatedAt: '2025-10-08T09:00:00Z',
+      updatedAt: '2025-10-12T17:30:00Z',
     },
     {
       id: 'tsk_005',
@@ -391,6 +417,10 @@ function createInitialDatabase(): DatabaseData {
       deadline: '2025-10-18',
       progress: 60,
       status: 'reopened',
+      qaStatus: 'Fail',
+      qaVerifiedAt: '2025-10-16T08:30:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
+      qaDefectReason: 'Special character regex triggers uncaught exception on auth API.',
       createdAt: '2025-10-01T09:00:00Z',
       updatedAt: '2025-10-16T11:24:00Z',
     },
@@ -410,8 +440,11 @@ function createInitialDatabase(): DatabaseData {
       submissionFile: 'dash_widgets_v2.zip',
       submissionNotes: 'All widgets verified.',
       submittedAt: '2025-10-13T17:00:00Z',
+      qaStatus: 'Pass',
+      qaVerifiedAt: '2025-10-13T18:00:00Z',
+      qaVerifiedByUserId: 'usr_tst_001',
       createdAt: '2025-10-02T09:00:00Z',
-      updatedAt: '2025-10-13T17:00:00Z',
+      updatedAt: '2025-10-13T18:00:00Z',
     },
   ];
 

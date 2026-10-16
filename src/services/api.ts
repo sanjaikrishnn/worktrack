@@ -100,6 +100,25 @@ export async function apiSubmitTaskWork(id: string, payload: { submissionNotes?:
   });
 }
 
+export async function apiVerifyTask(
+  id: string,
+  payload: {
+    result: 'PASS' | 'FAIL';
+    defectReason?: string;
+    defectDescription?: string;
+    severity?: 'High' | 'Medium' | 'Low';
+    stepsToReproduce?: string;
+    expectedResult?: string;
+    actualResult?: string;
+    evidenceName?: string;
+  }
+) {
+  return apiFetch<{ success: boolean; task: Task; bug?: BugReport; message: string }>(`/api/tasks/${id}/verify`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // Bugs
 export async function apiGetBugs() {
   return apiFetch<{ bugs: BugReport[] }>('/api/bugs');

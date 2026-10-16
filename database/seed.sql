@@ -12,12 +12,12 @@ INSERT INTO users (id, emp_id, name, email, password_hash, salt, role, departmen
 ('usr_adm_001', 'ADM001', 'Admin Director', 'admin@worktrack.com', 'a1b2c3d4e5f6', 'salt123', 'admin', 'Executive Administration', 'System Administrator', 600.00, true)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO tasks (id, task_id, title, description, module_id, module_name, assigned_to_user_id, original_delivery_user_id, deadline, progress, status) VALUES
-('tsk_001', 'T-001', 'Login Authentication & Validation', 'Implement secure login, session verification and error handling.', 'mod_login', 'Login Module', 'usr_emp_001', 'usr_emp_001', '2025-10-12', 100, 'completed'),
-('tsk_002', 'T-002', 'Payment Gateway Integration', 'Implement payment integration with gateway API.', 'mod_payment', 'Payment Gateway', 'usr_emp_001', 'usr_emp_002', '2025-10-15', 60, 'in_progress'),
-('tsk_003', 'T-003', 'UI Enhancement', 'Responsive layout for mobile viewport.', 'mod_ui', 'UI Enhancement', 'usr_emp_001', 'usr_emp_001', '2025-10-18', 20, 'in_progress'),
-('tsk_004', 'T-004', 'Reporting Dashboard Engine', 'CSV exports and aggregation charts.', 'mod_reporting', 'Reporting', 'usr_emp_003', 'usr_emp_003', '2025-10-20', 0, 'pending'),
-('tsk_005', 'TASK-012', 'Special Character Password Validation', 'Login fails when special characters are used.', 'mod_login', 'Login Module', 'usr_emp_001', 'usr_emp_001', '2025-10-18', 60, 'reopened')
+INSERT INTO tasks (id, task_id, title, description, module_id, module_name, assigned_to_user_id, original_delivery_user_id, deadline, progress, status, qa_status) VALUES
+('tsk_001', 'T-001', 'Login Authentication & Validation', 'Implement secure login, session verification and error handling.', 'mod_login', 'Login Module', 'usr_emp_001', 'usr_emp_001', '2025-10-12', 100, 'completed', 'Pass'),
+('tsk_002', 'T-002', 'Payment Gateway Integration', 'Implement payment integration with gateway API.', 'mod_payment', 'Payment Gateway', 'usr_emp_001', 'usr_emp_002', '2025-10-15', 60, 'reopened', 'Fail'),
+('tsk_003', 'T-003', 'UI Enhancement', 'Responsive layout for mobile viewport.', 'mod_ui', 'UI Enhancement', 'usr_emp_001', 'usr_emp_001', '2025-10-18', 100, 'completed', 'Pass'),
+('tsk_004', 'T-004', 'Reporting Dashboard Engine', 'CSV exports and aggregation charts.', 'mod_reporting', 'Reporting', 'usr_emp_003', 'usr_emp_003', '2025-10-20', 100, 'completed', 'Pass'),
+('tsk_005', 'TASK-012', 'Special Character Password Validation', 'Login fails when special characters are used.', 'mod_login', 'Login Module', 'usr_emp_001', 'usr_emp_001', '2025-10-18', 60, 'reopened', 'Fail')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO bug_reports (id, bug_id, title, description, severity, task_id, module_name, reported_by_user_id, status, assigned_to_user_id, original_deliverer_user_id, correction_deadline) VALUES

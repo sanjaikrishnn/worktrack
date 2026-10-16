@@ -231,7 +231,17 @@ export default function App() {
             <TaskDetailsPage
               user={currentUser}
               task={selectedTask}
-              onBack={() => setActiveTab('dashboard')}
+              tasks={filteredTasks}
+              onSelectTask={(taskId: string) => setSelectedTaskId(taskId)}
+              onBack={() =>
+                setActiveTab(
+                  currentUser.role === 'tester'
+                    ? 'tester-dashboard'
+                    : currentUser.role === 'manager' || currentUser.role === 'admin'
+                    ? 'manager-dashboard'
+                    : 'dashboard'
+                )
+              }
               onRefresh={refreshData}
             />
           )}
@@ -263,12 +273,13 @@ export default function App() {
           )}
 
           {activeTab === 'tester-modules' && (
-            <TesterDashboard
+            <TaskDetailsPage
               user={currentUser}
+              task={selectedTask}
               tasks={filteredTasks}
-              bugs={filteredBugs}
+              onSelectTask={(taskId: string) => setSelectedTaskId(taskId)}
+              onBack={() => setActiveTab('tester-dashboard')}
               onRefresh={refreshData}
-              onOpenTask={handleOpenTask}
             />
           )}
 

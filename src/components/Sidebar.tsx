@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } else if (user.role === 'tester') {
       return [
         { id: 'tester-dashboard', label: 'QA Dashboard', icon: LayoutDashboard },
-        { id: 'tester-modules', label: 'Module Verification', icon: Layers },
+        { id: 'tasks', label: 'Assigned Operational Tasks', icon: Layers },
         { id: 'tester-bugs', label: 'Report Defect', icon: Bug },
         { id: 'profile', label: 'My Profile', icon: UserIcon },
       ];
