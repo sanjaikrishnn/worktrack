@@ -1,0 +1,410 @@
+import React, { useState } from 'react';
+import { User, Task, BugReport } from '../types';
+import {
+  Layers,
+  CheckCircle2,
+  Bug,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  Send,
+  FileText,
+  ShieldCheck,
+  Search,
+} from 'lucide-react';
+import { apiReportBug } from '../services/api';
+
+interface TesterDashboardProps {
+  user: User;
+  tasks: Task[];
+  bugs: BugReport[];
+  onRefresh: () => void;
+  onOpenTask: (taskId: string) => void;
+}
+
+export const TesterDashboard: React.FC<TesterDashboardProps> = ({
+  user,
+  tasks,
+  bugs,
+  onRefresh,
+  onOpenTask,
+}) => {
+  const [bugTitle, setBugTitle] = useState('');
+  const [selectedTask, setSelectedTask] = useState(tasks[0]?.taskId || 'T-002');
+  const [moduleName, setModuleName] = useState('Payment Gateway');
+  const [severity, setSeverity] = useState<'High' | 'Medium' | 'Low'>('High');
+  const [description, setDescription] = useState('');
+  const [steps, setSteps] = useState('');
+  const [expected, setExpected] = useState('');
+  const [actual, setActual] = useState('');
+  const [evidenceName, setEvidenceName] = useState('defect-evidence.png');
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const totalModules = 12;
+  const testedCount = 8;
+  const bugsFoundCount = bugs.length || 3;
+
+  const handleTaskChange = (taskId: string) => {
+    setSelectedTask(taskId);
+    const matched = tasks.find((t) => t.taskId === taskId);
+    if (matched) {
+      setModuleName(matched.moduleName);
+    }
+  };
+
+  const handleSubmitBug = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bugTitle.trim() || !description.trim()) {
+      setErrorMsg('Please provide a title and detailed description.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      setSuccessMsg('');
+
+      const matchedTask = tasks.find((t) => t.taskId === selectedTask);
+
+      const res = await apiReportBug({
+        title: bugTitle.trim(),
+        description: description.trim(),
+        stepsToReproduce: steps.trim(),
+        expectedResult: expected.trim(),
+        actualResult: actual.trim(),
+        severity,
+        taskId: matchedTask ? matchedTask.id : selectedTask,
+        moduleName: moduleName || (matchedTask ? matchedTask.moduleName : 'General'),
+        hasEvidence: !!evidenceName,
+      });
+
+      setSuccessMsg(`Defect ${res.bug.bugId} recorded! Manager alerted for assignment and task reopened.`);
+      setBugTitle('');
+      setDescription('');
+      setSteps('');
+      setExpected('');
+      setActual('');
+      onRefresh();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to report bug.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Banner */}
+      <div className="bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#172033] tracking-tight">
+            QA Verification Dashboard
+          </h1>
+          <p className="text-xs sm:text-sm text-[#64748B] mt-1 font-medium">
+            Test delivered modules, record reproducible defects, and trigger corrective workflows.
+          </p>
+        </div>
+      </div>
+
+      {/* 3 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Modules */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+            <Layers className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <p className="text-xs text-[#64748B] font-medium">Total Testable Modules</p>
+            <p className="text-2xl font-bold text-[#172033] mt-0.5">{totalModules}</p>
+          </div>
+        </div>
+
+        {/* Tested Modules */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-teal-50 text-[#0D9488] flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <p className="text-xs text-[#64748B] font-medium">Tested & Verified</p>
+            <p className="text-2xl font-bold text-teal-700 mt-0.5">{testedCount}</p>
+          </div>
+        </div>
+
+        {/* Bugs Found */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <Bug className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <p className="text-xs text-[#64748B] font-medium">Defects Identified</p>
+            <p className="text-2xl font-bold text-rose-600 mt-0.5">{bugsFoundCount}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Submitted Modules Table & Create Bug Report Form */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Submitted Modules Table */}
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-[#172033] text-base">Submitted Modules</h3>
+              <p className="text-xs text-[#64748B]">Active QA verification pipeline</p>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-400">Build Artifacts</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-[#E2E8F0] text-[#64748B] font-semibold">
+                  <th className="py-3 px-4">Module</th>
+                  <th className="py-3 px-4">Author</th>
+                  <th className="py-3 px-4">QA Status</th>
+                  <th className="py-3 px-4">Tested On</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-[#172033]">
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3.5 px-4 font-bold text-[#172033]">Login Module</td>
+                  <td className="py-3.5 px-4 text-[#64748B]">John Doe</td>
+                  <td className="py-3.5 px-4">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      Pass
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-[#64748B]">10 Oct</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => onOpenTask('T-001')}
+                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
+                    >
+                      Inspect
+                    </button>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3.5 px-4 font-bold text-[#172033]">Payment Gateway</td>
+                  <td className="py-3.5 px-4 text-[#64748B]">Jane Smith</td>
+                  <td className="py-3.5 px-4">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                      Fail
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-[#64748B]">11 Oct</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => onOpenTask('T-002')}
+                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
+                    >
+                      Inspect
+                    </button>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3.5 px-4 font-bold text-[#172033]">Reporting Engine</td>
+                  <td className="py-3.5 px-4 text-[#64748B]">Alex Kumar</td>
+                  <td className="py-3.5 px-4">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      Pass
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-[#64748B]">12 Oct</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => onOpenTask('T-004')}
+                      className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
+                    >
+                      Inspect
+                    </button>
+                  </td>
+                </tr>
+
+                {tasks
+                  .filter((t) => t.status === 'completed' || t.status === 'reopened')
+                  .slice(0, 3)
+                  .map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-[#172033]">{t.moduleName}</td>
+                      <td className="py-3.5 px-4 text-[#64748B]">{t.assignedToName || 'Developer'}</td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            t.status === 'reopened'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {t.status === 'reopened' ? 'Fail' : 'Pass'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-[#64748B]">15 Oct</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => onOpenTask(t.taskId)}
+                          className="text-[#2563EB] hover:text-blue-800 font-bold cursor-pointer"
+                        >
+                          Inspect
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right Column: Create Bug Report Form */}
+        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-xs">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Bug className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-[#172033] text-base">Submit New Defect Report</h3>
+          </div>
+          <p className="text-xs text-[#64748B] mb-5">
+            Logs reproducible defect, automatically reopens affected task, and preserves delivering author.
+          </p>
+
+          {successMsg && (
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmitBug} className="space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-[#172033] mb-1">
+                Bug Summary / Title <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={bugTitle}
+                onChange={(e) => setBugTitle(e.target.value)}
+                placeholder="e.g. Login validation failure on special characters"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 font-medium"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-[#172033] mb-1">
+                  Affected Task <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedTask}
+                  onChange={(e) => handleTaskChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white text-slate-900 font-medium"
+                >
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.taskId}>
+                      {t.taskId} — {t.moduleName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#172033] mb-1">Severity Rating</label>
+                <select
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white text-slate-900 font-medium"
+                >
+                  <option value="High">High Severity (Blocker)</option>
+                  <option value="Medium">Medium Severity (Major)</option>
+                  <option value="Low">Low Severity (Minor)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#172033] mb-1">
+                Defect Description <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                required
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Explain the failure mode and symptoms in detail..."
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#172033] mb-1">Steps to Reproduce</label>
+              <textarea
+                rows={2}
+                value={steps}
+                onChange={(e) => setSteps(e.target.value)}
+                placeholder="1. Enter valid username&#10;2. Enter password with special symbols&#10;3. Click login"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 font-mono text-[11px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-[#172033] mb-1">Expected Result</label>
+                <input
+                  type="text"
+                  value={expected}
+                  onChange={(e) => setExpected(e.target.value)}
+                  placeholder="e.g. Validation error displayed"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#172033] mb-1">Actual Result</label>
+                <input
+                  type="text"
+                  value={actual}
+                  onChange={(e) => setActual(e.target.value)}
+                  placeholder="e.g. Uncaught 500 error"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#E2E8F0] focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-[#172033] mb-1">Evidence / Screenshot Attachment</label>
+              <input
+                type="file"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setEvidenceName(e.target.files[0].name);
+                  }
+                }}
+                className="block w-full text-xs text-[#64748B] file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-corporate-gradient text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 hover:opacity-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              {loading ? 'Submitting Defect...' : 'Submit Defect to Manager'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
